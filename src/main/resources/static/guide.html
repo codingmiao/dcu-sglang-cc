@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dcu-sglang-cc 使用说明</title>
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .guide-intro { font-size: 14px; line-height: 1.9; color: #374151; }
+    .steps { list-style: none; padding: 0; margin: 4px 0 0; counter-reset: step; }
+    .steps > li { position: relative; padding: 0 0 18px 42px; margin-bottom: 16px; border-bottom: 1px solid #eef0f2; }
+    .steps > li:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .steps > li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0;
+      width: 26px; height: 26px; border-radius: 50%; background: #1f6feb; color: #fff; font-size: 13px;
+      font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .step-title { font-size: 14px; font-weight: 600; color: #1f2329; margin-bottom: 8px; }
+    code { background: #eef0f2; padding: 1px 6px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+           font-size: 12px; color: #cf222e; }
+    pre.json { margin: 8px 0 0; }
+    .code-block { position: relative; margin-top: 8px; }
+    .copy-btn { position: absolute; top: 8px; right: 8px; z-index: 2; border: 1px solid #30363d; background: #21262d;
+                color: #c9d1d9; border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+    .copy-btn:hover { background: #30363d; }
+    .note { font-size: 13px; color: #6b7280; margin-top: 10px; line-height: 1.8; }
+    .note b { color: #374151; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>dcu-sglang-cc</h1>
+    <nav><a href="index.html">返回统计</a></nav>
+    <span class="muted" style="margin-left:auto">sglang Anthropic 代理</span>
+  </header>
+
+  <div class="wrap">
+    <div class="panel">
+      <h2>使用说明</h2>
+      <div class="guide-intro">
+        经过一段时间的调优，目前已经能完成基本的编码任务了。对 Claude Code 完成了输入输出适配，欢迎各位试用。
+        特别地，写文档等非编码工作的大佬们也可以试用下，给我整点非编码场景的训练数据 🐶。
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card"><div class="label">单请求速度</div>
+        <div class="value">~90 <span style="font-size:14px;font-weight:600">token/s</span></div>
+        <div class="sub">64k 输入 / 1k 输出</div></div>
+      <div class="card"><div class="label">8 并发速度</div>
+        <div class="value">~600 <span style="font-size:14px;font-weight:600">token/s</span></div>
+        <div class="sub">8 个并发请求</div></div>
+    </div>
+
+    <div class="panel">
+      <h2>使用方法</h2>
+      <ol class="steps">
+        <li>
+          <div class="step-title">安装 Node.js 18 或更新版本</div>
+        </li>
+        <li>
+          <div class="step-title">安装 Claude Code</div>
+          <pre class="json">npm install -g @anthropic-ai/claude-code</pre>
+        </li>
+        <li>
+          <div class="step-title">编辑或新增 <code>settings.json</code></div>
+          <div class="note">
+            macOS &amp; Linux：<code>~/.claude/settings.json</code><br>
+            Windows：<code>用户目录/.claude/settings.json</code>
+          </div>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyJson(this)">复制</button>
+            <pre class="json" id="settings-json">{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "&lt;your_api_key&gt;",
+    "ANTHROPIC_BASE_URL": "xxx/dcu-sglang-cc",
+    "API_TIMEOUT_MS": "3600000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "131072"
+  },
+  "tui": "fullscreen"
+}</pre>
+          </div>
+          <div class="note"><b>your_api_key</b> 需联系管理员申请。</div>
+        </li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <h2>启动 Claude Code</h2>
+      <div class="note" style="margin-top:0">在终端进入你的项目目录后执行：</div>
+      <div class="code-block">
+        <pre class="json">claude                 # 启动交互式会话
+claude "帮我写个脚本"    # 直接带任务启动
+claude -c              # 继续上一次会话
+claude -r              # 选择并恢复历史会话</pre>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>常用操作</h2>
+      <table>
+        <thead><tr><th style="width:200px">操作</th><th style="text-align:left">说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>/help</code></td><td style="text-align:left">查看所有可用命令</td></tr>
+          <tr><td><code>/clear</code></td><td style="text-align:left">清空当前上下文，重新开始</td></tr>
+          <tr><td><code>/compact</code></td><td style="text-align:left">压缩上下文（保留要点，释放空间）</td></tr>
+          <tr><td><code>/model</code></td><td style="text-align:left">切换模型</td></tr>
+          <tr><td><code>/cost</code></td><td style="text-align:left">查看本次会话 token 用量</td></tr>
+          <tr><td><code>/init</code></td><td style="text-align:left">为当前项目生成 CLAUDE.md 项目说明</td></tr>
+          <tr><td><code>/memory</code></td><td style="text-align:left">编辑记忆文件</td></tr>
+          <tr><td><code>/status</code></td><td style="text-align:left">查看当前状态</td></tr>
+          <tr><td><code>/quit</code></td><td style="text-align:left">退出</td></tr>
+        </tbody>
+      </table>
+      <div class="note">
+        其它常用：<b>Shift+Tab</b> 切换自动接受 / 计划模式；<b>Esc</b> 中断当前操作；
+        <b>#</b> 开头写入记忆；<b>!</b> 开头直接执行 shell 命令；<b>@</b> 引用文件。
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>已知问题</h2>
+      <div class="notice">
+        部分版本的 CC 会同时发起两个 tool_call，产生异常
+        <code>API Error: Content block is not a text block</code>。
+        此时输入 <b>「请记住，每次最多调用一个工具」</b>，强制 CC 改为单个调用工具即可。
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 把 ANTHROPIC_BASE_URL 里的 xxx 替换为当前浏览器地址（协议+主机+端口），
+    // 这样展示与「复制」都直接给出可用的服务地址。
+    document.addEventListener('DOMContentLoaded', () => {
+      const el = document.getElementById('settings-json');
+      if (el) el.textContent = el.textContent.replace('xxx', window.location.origin);
+    });
+
+    function copyJson(btn) {
+      const el = document.getElementById('settings-json');
+      navigator.clipboard.writeText(el.textContent).then(() => {
+        btn.textContent = '已复制';
+        setTimeout(() => btn.textContent = '复制', 1500);
+      });
+    }
+  </script>
+</body>
+</html>

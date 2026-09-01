@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dcu-sglang-cc 统计</title>
+  <script src="vue.global.prod.js"></script>
+  <script src="d3.v7.min.js"></script>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>dcu-sglang-cc</h1>
+      <span class="badge" :class="{off: !online}">{{ online ? 'online' : 'offline' }}</span>
+      <nav>
+        <a :class="{active: view==='service'}" @click="view='service'">服务统计</a>
+        <a v-if="loggedIn" :class="{active: view==='user'}" @click="view='user'">用户统计</a>
+        <a v-if="loggedIn" :class="{active: view==='admin'}" @click="view='admin'">用户管理</a>
+        <a href="guide.html">使用说明</a>
+      </nav>
+      <span class="muted" style="margin-left:auto">sglang Anthropic 代理</span>
+      <button v-if="!loggedIn" class="btn small" @click="showLogin=true">登录</button>
+      <button v-else class="btn small" @click="logout">退出</button>
+    </header>
+
+    <div class="wrap">
+      <service-view v-if="view==='service'" :logged-in="loggedIn"></service-view>
+      <user-view v-else-if="view==='user' && loggedIn"></user-view>
+      <admin-view v-else-if="view==='admin' && loggedIn"></admin-view>
+      <service-view v-else :logged-in="loggedIn"></service-view>
+    </div>
+
+    <!-- 登录弹层（右上角触发） -->
+    <div class="modal-mask" v-if="showLogin" @click.self="showLogin=false">
+      <div class="modal login-modal" style="width:min(360px,92vw)">
+        <div class="head"><h3>管理员登录</h3><button class="close" @click="showLogin=false">×</button></div>
+        <div class="body">
+          <div class="field"><label>用户名</label><input v-model="username" @keyup.enter="doLogin"></div>
+          <div class="field"><label>密码</label><input type="password" v-model="password" @keyup.enter="doLogin"></div>
+          <button class="btn primary" style="width:100%" @click="doLogin">登录</button>
+          <div class="muted" v-if="loginErr" style="color:#cf222e;margin-top:8px">{{ loginErr }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/record-modal.js"></script>
+  <script src="js/service-view.js"></script>
+  <script src="js/user-view.js"></script>
+  <script src="js/admin-view.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

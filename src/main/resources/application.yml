@@ -1,0 +1,62 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    # 整个站点（页面 + 接口）统一挂在该前缀下：/dcu-sglang-cc/...
+    context-path: /dcu-sglang-cc
+
+spring:
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+logging:
+  level:
+    root: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+dcu:
+  # 超时（秒）
+  connect-timeout: 30
+  read-timeout: 600
+  write-timeout: 600
+
+  # /v1/messages 并发与排队
+  # 最大并发数：同时转发到 sglang 的请求上限，超过则排队
+  max-concurrency: 16
+  # 排队长度上限：等待并发许可的请求数，超过则返回系统繁忙
+  queue-size: 128
+  # 排队等待并发许可的超时（秒），超时返回系统繁忙
+  queue-wait-timeout: 60
+
+  # 要代理的 sglang 后端
+  backend:
+    inner-name: "chat_min"
+    base-url: "http://sk-ai:19800"
+    api-key: "sk-ai"
+
+  # 修复开关（各自独立）
+  fix:
+    # 是否把非 assistant 的 role 改成 user（sglang 不支持 system/tool 等角色）
+    system-role: true
+    # 是否只保留第一个 tool_use，丢弃第 2 个及之后的
+    single-tool-use: true
+
+  # 统计 / 明细记录
+  stats:
+    data-dir: "data"
+    max-file-size: 20971520   # 20MB
+    sqlite-path: "data/stats.db"
+
+  # 管理员（登录 /admin 维护用户）
+  admin:
+    username: "admin"
+    password: "admin"
+
+  # 可用用户（首次启动 seed 到 user 表；之后在管理页维护）
+  users:
+    - name: "alice"
+      api-key: "key-alice"
+    - name: "bob"
+      api-key: "key-bob"

@@ -1,0 +1,114 @@
+* { box-sizing: border-box; }
+body { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+       margin: 0; background: #f5f6f8; color: #1f2329; }
+
+header { background: #1f2329; color: #fff; padding: 0 24px; display: flex;
+         align-items: center; gap: 20px; height: 52px; }
+header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+.badge { font-size: 12px; padding: 2px 10px; border-radius: 10px; background: #2ea043; }
+.badge.off { background: #d1242f; }
+nav { display: flex; gap: 4px; margin-left: 12px; }
+nav a { color: #c9ced6; text-decoration: none; font-size: 14px; padding: 6px 14px;
+        border-radius: 6px; cursor: pointer; }
+nav a.active { background: #3a4048; color: #fff; }
+nav a:hover { color: #fff; }
+.muted { color: #9aa0a6; font-size: 12px; }
+.wrap { padding: 20px 24px; max-width: 1240px; margin: 0 auto; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+         gap: 14px; margin-bottom: 20px; }
+.card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.card .label { font-size: 13px; color: #6b7280; }
+.card .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+.card .sub { font-size: 12px; color: #9aa0a6; margin-top: 4px; }
+
+.panel { background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+         margin-bottom: 20px; }
+.panel h2 { font-size: 15px; margin: 0 0 14px; font-weight: 600; }
+.panel .hint { font-size: 12px; color: #9aa0a6; margin-bottom: 10px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: right; padding: 9px 10px; border-bottom: 1px solid #eef0f2; }
+th:first-child, td:first-child { text-align: left; }
+th { color: #6b7280; font-weight: 600; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: #f7f9fc; }
+tr.expanded { background: #eef4ff; }
+
+.bar-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12px; }
+.bar-name { width: 110px; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { flex: 1; background: #eef0f2; border-radius: 4px; height: 18px; overflow: hidden; }
+.bar-fill { height: 100%; background: #4f8ef7; }
+.bar-val { width: 150px; text-align: right; color: #6b7280; }
+
+.tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; }
+.tag.ok { background: #e6f4ea; color: #1a7f37; }
+.tag.bad { background: #fde8e8; color: #cf222e; }
+.tag.stream { background: #eef0f2; color: #57606a; }
+
+.pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+.pager button { border: 1px solid #d0d7de; background: #fff; border-radius: 6px; padding: 4px 12px;
+                cursor: pointer; }
+.pager button:disabled { opacity: .4; cursor: default; }
+
+/* 下钻展开区 */
+.drill { margin-top: 14px; padding: 14px; background: #f7f9fc; border-radius: 8px;
+          border: 1px solid #e3e8ef; }
+.drill h3 { font-size: 13px; margin: 0 0 10px; color: #374151; }
+.drill .row { display: flex; gap: 20px; flex-wrap: wrap; }
+.drill .col { flex: 1; min-width: 320px; }
+
+/* 记录弹层 */
+.modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex;
+              align-items: center; justify-content: center; z-index: 100; }
+.modal { background: #fff; border-radius: 10px; width: min(900px, 92vw); max-height: 86vh;
+         display: flex; flex-direction: column; box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+.modal .head { padding: 14px 18px; border-bottom: 1px solid #eef0f2; display: flex;
+               justify-content: space-between; align-items: center; }
+.modal .head h3 { margin: 0; font-size: 15px; }
+.modal .body { padding: 16px 18px; overflow: auto; }
+.modal .close { border: none; background: none; font-size: 20px; cursor: pointer; color: #6b7280; }
+pre.json { background: #0d1117; color: #c9d1d9; padding: 14px; border-radius: 8px;
+           font-size: 12px; overflow: auto; max-height: 40vh; white-space: pre-wrap;
+           word-break: break-word; }
+.notice { padding: 14px; background: #fff8e6; border: 1px solid #f0d98c; border-radius: 8px;
+          color: #7a5b00; font-size: 13px; }
+
+/* 表单 */
+.form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.form .field { display: flex; flex-direction: column; gap: 4px; }
+.form label { font-size: 12px; color: #6b7280; }
+.form input { border: 1px solid #d0d7de; border-radius: 6px; padding: 6px 10px; font-size: 13px;
+              min-width: 160px; }
+.btn { border: 1px solid #d0d7de; background: #fff; border-radius: 6px; padding: 7px 14px;
+       font-size: 13px; cursor: pointer; }
+.btn.primary { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+.btn.danger { color: #cf222e; border-color: #f0b3b8; }
+.btn.small { padding: 3px 10px; font-size: 12px; }
+.actions { display: flex; gap: 6px; }
+.login-box { max-width: 340px; margin: 60px auto; }
+.login-box .field { margin-bottom: 12px; }
+.login-box input { width: 100%; }
+
+/* 右上角登录弹层 */
+.login-modal .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.login-modal .field label { font-size: 12px; color: #6b7280; }
+.login-modal .field input { border: 1px solid #d0d7de; border-radius: 6px; padding: 7px 10px;
+                            font-size: 13px; width: 100%; }
+.toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+          background: #1f2329; color: #fff; padding: 8px 18px; border-radius: 8px;
+          font-size: 13px; z-index: 200; }
+
+/* 折线图图例（可点击显示/隐藏序列） */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 8px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+               color: #374151; cursor: pointer; user-select: none; }
+.legend-item i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.legend-item.off { opacity: .4; text-decoration: line-through; }
+.legend-item.off i { background: #c0c4c9 !important; }
+
+/* 时间范围选择器 */
+.range { display: inline-flex; gap: 4px; margin-left: 12px; vertical-align: middle; }
+.range .btn { border: 1px solid #d0d7de; background: #fff; border-radius: 6px;
+              padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.range .btn.active { background: #1f6feb; color: #fff; border-color: #1f6feb; }
