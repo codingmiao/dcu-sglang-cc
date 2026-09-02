@@ -1,14 +1,21 @@
 package org.wowtools.dcu.pojo;
 
+import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Anthropic API 请求体（/v1/messages）。
- * 字段尽量宽松，未识别字段忽略，保证能原样转发给 sglang。
+ * 字段尽量宽松：未识别字段经 {@code @JsonAnySetter} 收进 extras、序列化时原样回写，
+ * 保证能原样转发给 sglang（不丢字段、不因新参数 500）。
  */
 @Data
 public class AnthropicMessageRequest {
@@ -16,8 +23,9 @@ public class AnthropicMessageRequest {
     @JsonProperty("model")
     private String model;
 
+    // 协议允许 system 为纯字符串或对象数组，用 Object 承接原样透传（见 code-review #7）
     @JsonProperty("system")
-    private List<SystemMessage> system;
+    private Object system;
 
     @JsonProperty("messages")
     private List<ConversationMessage> messages;
@@ -58,25 +66,38 @@ public class AnthropicMessageRequest {
     @JsonProperty("top_k")
     private Integer topK;
 
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    private final Map<String, Object> extras = new LinkedHashMap<>();
+
+    @JsonAnySetter
+    public void setExtra(String key, Object value) {
+        extras.put(key, value);
+    }
+
+    @JsonAnyGetter
+    public Map<String, Object> getExtras() {
+        return extras;
+    }
+
     @Data
     public static class Metadata {
         @JsonProperty("user_id")
         private String userId;
-    }
 
-    @Data
-    public static class SystemMessage {
-        @JsonProperty("text")
-        private String text;
+        @Getter(AccessLevel.NONE)
+        @Setter(AccessLevel.NONE)
+        private final Map<String, Object> extras = new LinkedHashMap<>();
 
-        @JsonProperty("content")
-        private String content;
+        @JsonAnySetter
+        public void setExtra(String key, Object value) {
+            extras.put(key, value);
+        }
 
-        @JsonProperty("type")
-        private String type;
-
-        @JsonProperty("cache_control")
-        private Object cacheControl;
+        @JsonAnyGetter
+        public Map<String, Object> getExtras() {
+            return extras;
+        }
     }
 
     /**
@@ -89,6 +110,20 @@ public class AnthropicMessageRequest {
 
         @JsonProperty("content")
         private Object content;
+
+        @Getter(AccessLevel.NONE)
+        @Setter(AccessLevel.NONE)
+        private final Map<String, Object> extras = new LinkedHashMap<>();
+
+        @JsonAnySetter
+        public void setExtra(String key, Object value) {
+            extras.put(key, value);
+        }
+
+        @JsonAnyGetter
+        public Map<String, Object> getExtras() {
+            return extras;
+        }
     }
 
     @Data
@@ -104,5 +139,19 @@ public class AnthropicMessageRequest {
 
         @JsonProperty("type")
         private Object type;
+
+        @Getter(AccessLevel.NONE)
+        @Setter(AccessLevel.NONE)
+        private final Map<String, Object> extras = new LinkedHashMap<>();
+
+        @JsonAnySetter
+        public void setExtra(String key, Object value) {
+            extras.put(key, value);
+        }
+
+        @JsonAnyGetter
+        public Map<String, Object> getExtras() {
+            return extras;
+        }
     }
 }

@@ -3,17 +3,22 @@ window.ServiceView = {
   props: { loggedIn: { type: Boolean, default: false } },
   template: `
   <div>
-    <!-- 概览卡片 -->
+    <!-- 概览卡片（6 个指标，等宽一行） -->
     <div class="cards">
       <div class="card"><div class="label">总请求数</div><div class="value">{{ Dcu.fmt(ov.total_requests) }}</div></div>
       <div class="card"><div class="label">成功 / 失败</div>
         <div class="value">{{ Dcu.fmt(ov.success_count) }} / {{ Dcu.fmt(ov.total_requests) - Dcu.fmt(ov.success_count) }}</div></div>
       <div class="card"><div class="label">输入 tokens</div><div class="value">{{ Dcu.fmt(ov.total_input_tokens) }}</div></div>
       <div class="card"><div class="label">输出 tokens</div><div class="value">{{ Dcu.fmt(ov.total_output_tokens) }}</div></div>
+      <div class="card"><div class="label">改动行数</div><div class="value">{{ Dcu.fmt(ov.total_lines_changed) }}</div></div>
       <div class="card"><div class="label">平均耗时</div><div class="value">{{ Dcu.fmtMs(ov.avg_cost) }} ms</div></div>
-      <div class="card"><div class="label">当前状态</div>
-        <div class="value" style="font-size:18px">{{ svc.status }}</div>
-        <div class="sub">运行 {{ uptime }} · 在途 {{ svc.inFlight }} · 队列 {{ svc.queueDepth }}</div></div>
+    </div>
+
+    <!-- 服务状态条 -->
+    <div class="status-bar">
+      <span class="dot" :class="svc.status === 'online' ? 'on' : 'off'"></span>
+      <span class="st">{{ svc.status }}</span>
+      <span class="muted">运行 {{ uptime }} · 在途 {{ svc.inFlight }} · 队列 {{ svc.queueDepth }}</span>
     </div>
 
     <!-- 请求趋势（折线图，可下钻） -->
@@ -41,7 +46,7 @@ window.ServiceView = {
       <h2>请求明细 <span class="muted">（{{ drill.title }}）</span>
         <a class="muted" style="float:right;cursor:pointer" @click="drill=null">关闭</a></h2>
       <table>
-        <thead><tr><th>时间</th><th>用户</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>耗时</th><th>结果</th></tr></thead>
+        <thead><tr><th>时间</th><th>用户</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>改动</th><th>耗时</th><th>结果</th></tr></thead>
         <tbody>
           <tr v-for="r in drill.rows" :key="r.log_id" class="clickable" @click="openRecord(r.log_id)">
             <td>{{ Dcu.ts(r.ts) }}</td>
@@ -50,6 +55,7 @@ window.ServiceView = {
             <td><span class="tag stream" v-if="r.stream==1">stream</span><span v-else class="muted">-</span></td>
             <td>{{ Dcu.fmt(r.input_tokens) }}</td>
             <td>{{ Dcu.fmt(r.output_tokens) }}</td>
+            <td>{{ Dcu.fmt(r.lines_changed) }}</td>
             <td>{{ Dcu.fmtMs(r.cost) }} ms</td>
             <td><span class="tag" :class="r.success==1?'ok':'bad'">{{ r.success==1?'成功':'失败' }}</span></td>
           </tr>
@@ -70,7 +76,7 @@ window.ServiceView = {
       ov: {}, svc: {}, byTime: [], byModel: [],
       // 时间范围：bucket 单位秒，from 单位毫秒（时间窗长度，null=全部）
       ranges: [
-        { key: '60s', label: '每60秒', bucket: 60, from: null },
+        { key: '1h', label: '近一小时', bucket: 60, from: 3600 * 1000 },
         { key: '24h', label: '近24小时', bucket: 3600, from: 24 * 3600 * 1000 },
         { key: '7d', label: '近7天', bucket: 4 * 3600 * 1000, from: 7 * 86400 * 1000 },
         { key: '30d', label: '近30天', bucket: 86400 * 1000, from: 30 * 86400 * 1000 },
@@ -80,6 +86,7 @@ window.ServiceView = {
         { key: 'requests', label: '请求数' },
         { key: 'input_tokens', label: '输入token' },
         { key: 'output_tokens', label: '输出token' },
+        { key: 'lines_changed', label: '改动行数' },
         { key: 'avg_cost', label: '平均耗时(ms)' },
         { key: 'tps', label: '每秒输出token' },
       ],

@@ -61,7 +61,7 @@ public class SglangClient {
         try (Response response = okHttpClient.newCall(httpRequest).execute()) {
             String responseBody = response.body() != null ? response.body().string() : null;
             if (!response.isSuccessful()) {
-                throw new RuntimeException("sglang HTTP " + response.code() + ": " + responseBody);
+                throw new UpstreamException(response.code(), responseBody);
             }
             return Constant.objectMapper.readValue(responseBody, AnthropicMessageResponse.class);
         } catch (RuntimeException e) {
@@ -73,17 +73,25 @@ public class SglangClient {
 
     /**
      * 流式请求，逐事件回调。
+     *
+     * @param onCall 上游 {@link okhttp3.Call} 创建后回调，调用方可持有引用以便在
+     *              客户端断开时 {@code call.cancel()} 立即中断上游读取（#12）
      */
-    public void sendStream(AnthropicMessageRequest request, String logId, Consumer<AnthropicStreamData> onEvent) {
+    public void sendStream(AnthropicMessageRequest request, String logId,
+                           Consumer<AnthropicStreamData> onEvent, Consumer<okhttp3.Call> onCall) {
         request.setModel(innerModel);
         request.setStream(true);
         String strBody = toJson(request);
         Request httpRequest = buildRequest(strBody, true);
 
-        try (Response response = okHttpClient.newCall(httpRequest).execute()) {
+        okhttp3.Call call = okHttpClient.newCall(httpRequest);
+        if (onCall != null) {
+            onCall.accept(call);
+        }
+        try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String err = response.body() != null ? response.body().string() : null;
-                throw new RuntimeException("sglang HTTP " + response.code() + ": " + err);
+                throw new UpstreamException(response.code(), err);
             }
             try (BufferedReader reader = new BufferedReader(response.body().charStream())) {
                 String line;

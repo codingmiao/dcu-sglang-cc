@@ -17,7 +17,7 @@ import java.util.List;
  *     api-key: sk-ai
  *   fix:
  *     system-role: true
- *     single-tool-use: true
+ *     mismatched-delta: true
  *   users:
  *     - name: alice
  *       api-key: key-alice
@@ -81,8 +81,13 @@ public class DcuConfiguration {
         /** 是否把非 assistant 的 role 改成 user（sglang 不支持 system/tool 等角色） */
         private boolean systemRole = false;
 
-        /** 是否只保留第一个 tool_use，丢弃第 2 个及之后的（客户端一次只能处理一个） */
-        private boolean singleToolUse = false;
+        /**
+         * 是否丢弃与所在 content block 类型不匹配的 content_block_delta。
+         * sglang 输出多个 tool call 时，会把 tool 之间模型吐出的分隔文本（如 "\n"）
+         * 以 text_delta 形式混进 tool_use 块的事件流，客户端会报
+         * "Content block is not a text block"。
+         */
+        private boolean mismatchedDelta = false;
     }
 
     @Data

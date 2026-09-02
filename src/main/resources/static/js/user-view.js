@@ -6,7 +6,7 @@ window.UserView = {
       <h2>用户统计</h2>
       <div class="hint">点击某用户行，展开其最近调用记录与趋势</div>
       <table>
-        <thead><tr><th>用户</th><th>请求数</th><th>输入</th><th>输出</th><th>总tokens</th><th>平均耗时</th><th>成功率</th><th>最近活跃</th></tr></thead>
+        <thead><tr><th>用户</th><th>请求数</th><th>输入</th><th>输出</th><th>总tokens</th><th>改动行数</th><th>平均耗时</th><th>成功率</th><th>最近活跃</th></tr></thead>
         <tbody>
           <tr v-for="u in users" :key="u.user" class="clickable"
               :class="{expanded: expanded===u.user}" @click="toggle(u.user)">
@@ -15,6 +15,7 @@ window.UserView = {
             <td>{{ Dcu.fmt(u.input_tokens) }}</td>
             <td>{{ Dcu.fmt(u.output_tokens) }}</td>
             <td>{{ Dcu.fmt(u.input_tokens + u.output_tokens) }}</td>
+            <td>{{ Dcu.fmt(u.lines_changed) }}</td>
             <td>{{ Dcu.fmtMs(u.avg_cost) }} ms</td>
             <td>{{ successRate(u) }}%</td>
             <td>{{ Dcu.ts(u.last_ts) }}</td>
@@ -46,7 +47,7 @@ window.UserView = {
         </div>
         <h3 style="margin-top:14px">最近调用记录</h3>
         <table>
-          <thead><tr><th>时间</th><th>logId</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>耗时</th><th>stop</th><th>结果</th></tr></thead>
+          <thead><tr><th>时间</th><th>logId</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>改动</th><th>耗时</th><th>stop</th><th>结果</th></tr></thead>
           <tbody>
             <tr v-for="r in records" :key="r.log_id" class="clickable" @click="openRecord(r.log_id)">
               <td>{{ Dcu.ts(r.ts) }}</td>
@@ -55,6 +56,7 @@ window.UserView = {
               <td><span class="tag stream" v-if="r.stream==1">stream</span><span v-else class="muted">-</span></td>
               <td>{{ Dcu.fmt(r.input_tokens) }}</td>
               <td>{{ Dcu.fmt(r.output_tokens) }}</td>
+              <td>{{ Dcu.fmt(r.lines_changed) }}</td>
               <td>{{ Dcu.fmtMs(r.cost) }} ms</td>
               <td class="muted">{{ r.stop_reason || '-' }}</td>
               <td><span class="tag" :class="r.success==1?'ok':'bad'">{{ r.success==1?'成功':'失败' }}</span></td>
@@ -77,7 +79,7 @@ window.UserView = {
       users: [], page: 0, size: 10,
       expanded: null, records: [], recPage: 0, recSize: 10,
       ranges: [
-        { key: '60s', label: '每60秒', bucket: 60, from: null },
+        { key: '1h', label: '近一小时', bucket: 60, from: 3600 * 1000 },
         { key: '24h', label: '近24小时', bucket: 3600, from: 24 * 3600 * 1000 },
         { key: '7d', label: '近7天', bucket: 4 * 3600 * 1000, from: 7 * 86400 * 1000 },
         { key: '30d', label: '近30天', bucket: 86400 * 1000, from: 30 * 86400 * 1000 },
@@ -87,6 +89,7 @@ window.UserView = {
         { key: 'requests', label: '请求数' },
         { key: 'input_tokens', label: '输入token' },
         { key: 'output_tokens', label: '输出token' },
+        { key: 'lines_changed', label: '改动行数' },
         { key: 'avg_cost', label: '平均耗时(ms)' },
         { key: 'tps', label: '每秒输出token' },
       ],

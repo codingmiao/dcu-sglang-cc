@@ -3,6 +3,7 @@ package org.wowtools.dcu.stats;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import org.wowtools.dcu.config.DcuConfiguration;
 
@@ -24,6 +25,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@DependsOn("schemaMigrator")
 public class UserStore {
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -33,19 +35,7 @@ public class UserStore {
 
     @PostConstruct
     public void init() throws Exception {
-        try (Connection c = sqlite.open(); Statement st = c.createStatement()) {
-            st.execute("""
-                    CREATE TABLE IF NOT EXISTS user (
-                        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name       TEXT UNIQUE NOT NULL,
-                        api_key    TEXT UNIQUE NOT NULL,
-                        enabled    INTEGER NOT NULL DEFAULT 1,
-                        created_at INTEGER,
-                        updated_at INTEGER
-                    );
-                    """);
-            st.execute("CREATE INDEX IF NOT EXISTS idx_user_key ON user(api_key);");
-        }
+        // 建表 DDL 已收进 SchemaMigrator（db/migration/V1__baseline.sql），此处不再重复
         seedFromConfig();
     }
 
@@ -81,46 +71,6 @@ public class UserStore {
             log.info("已从配置 seed 用户到 user 表");
         } catch (Exception e) {
             log.error("seed 用户失败", e);
-        }
-    }
-
-    /**
-     * 校验 apiKey 是否有效（存在且启用）。
-     */
-    public boolean isValid(String apiKey) {
-        if (apiKey == null) {
-            return false;
-        }
-        try (Connection c = sqlite.open();
-             PreparedStatement ps = c.prepareStatement(
-                     "SELECT 1 FROM user WHERE api_key=? AND enabled=1")) {
-            ps.setString(1, apiKey);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (Exception e) {
-            log.error("校验 apiKey 失败", e);
-            return false;
-        }
-    }
-
-    /**
-     * 由 apiKey 反查用户名（仅启用用户）；无效返回 null。
-     */
-    public String nameOf(String apiKey) {
-        if (apiKey == null) {
-            return null;
-        }
-        try (Connection c = sqlite.open();
-             PreparedStatement ps = c.prepareStatement(
-                     "SELECT name FROM user WHERE api_key=? AND enabled=1")) {
-            ps.setString(1, apiKey);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getString(1) : null;
-            }
-        } catch (Exception e) {
-            log.error("反查用户名失败", e);
-            return null;
         }
     }
 
@@ -205,6 +155,47 @@ public class UserStore {
         String key = generateKey();
         update(id, null, key, null);
         return key;
+    }
+
+    /**
+     * 单事务更新：重置 apiKey 的同时改 name / enabled（#13）。
+     * 原先 resetKey + update 是两次独立连接/事务，中间失败会留下"key 已重置但其它字段没改"
+     * 的中间态；这里合并成一条 UPDATE，要么全改要么全不改。
+     *
+     * @param newKey 新 apiKey（非空）
+     * @return 新 key
+     */
+    public String updateWithKey(long id, String name, String newKey, Integer enabled) throws Exception {
+        // 占位符顺序：updated_at, api_key, [name], [enabled], id
+        StringBuilder sql = new StringBuilder("UPDATE user SET updated_at=?, api_key=?");
+        List<Object> args = new ArrayList<>();
+        args.add(System.currentTimeMillis());
+        args.add(newKey);
+        if (name != null) {
+            sql.append(", name=?");
+            args.add(name);
+        }
+        if (enabled != null) {
+            sql.append(", enabled=?");
+            args.add(enabled);
+        }
+        sql.append(" WHERE id=?");
+        args.add(id);
+        try (Connection c = sqlite.open();
+             PreparedStatement ps = c.prepareStatement(sql.toString())) {
+            int i = 1;
+            for (Object a : args) {
+                if (a instanceof Integer) {
+                    ps.setInt(i++, (Integer) a);
+                } else if (a instanceof Long) {
+                    ps.setLong(i++, (Long) a);
+                } else {
+                    ps.setString(i++, (String) a);
+                }
+            }
+            ps.executeUpdate();
+        }
+        return newKey;
     }
 
     /**

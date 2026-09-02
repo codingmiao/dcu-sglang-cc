@@ -4,12 +4,12 @@ import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@DependsOn("schemaMigrator")
 public class StatsStore {
 
     private static final int BATCH_SIZE = 100;
@@ -44,26 +45,7 @@ public class StatsStore {
 
     @PostConstruct
     public void init() throws Exception {
-        try (Connection c = sqlite.open(); Statement st = c.createStatement()) {
-            st.execute("""
-                    CREATE TABLE IF NOT EXISTS request_stat (
-                        id            INTEGER PRIMARY KEY AUTOINCREMENT,
-                        log_id        TEXT,
-                        user          TEXT,
-                        model         TEXT,
-                        stream        INTEGER,
-                        input_tokens  INTEGER,
-                        output_tokens INTEGER,
-                        cost          INTEGER,
-                        stop_reason   TEXT,
-                        success       INTEGER,
-                        ts            INTEGER
-                    );
-                    """);
-            st.execute("CREATE INDEX IF NOT EXISTS idx_stat_ts ON request_stat(ts);");
-            st.execute("CREATE INDEX IF NOT EXISTS idx_stat_user ON request_stat(user);");
-            st.execute("CREATE INDEX IF NOT EXISTS idx_stat_log ON request_stat(log_id);");
-        }
+        // 建表 DDL 已收进 SchemaMigrator（db/migration/V1__baseline.sql），此处不再重复
         consumerThread = Thread.ofVirtual().name("stat-writer").start(this::consumeStats);
         log.info("SQLite 统计库就绪，批量写入线程已启动");
     }
@@ -123,8 +105,8 @@ public class StatsStore {
         }
         String sql = """
                 INSERT INTO request_stat
-                (log_id, user, model, stream, input_tokens, output_tokens, cost, stop_reason, success, ts)
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+                (log_id, user, model, stream, input_tokens, output_tokens, lines_changed, cost, stop_reason, success, ts)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
                 """;
         try (Connection c = sqlite.open()) {
             c.setAutoCommit(false);
@@ -136,10 +118,11 @@ public class StatsStore {
                     ps.setInt(4, s.isStream() ? 1 : 0);
                     ps.setInt(5, s.getInputTokens());
                     ps.setInt(6, s.getOutputTokens());
-                    ps.setLong(7, s.getCost());
-                    ps.setString(8, s.getStopReason());
-                    ps.setInt(9, s.isSuccess() ? 1 : 0);
-                    ps.setLong(10, s.getTs());
+                    ps.setInt(7, s.getLinesChanged());
+                    ps.setLong(8, s.getCost());
+                    ps.setString(9, s.getStopReason());
+                    ps.setInt(10, s.isSuccess() ? 1 : 0);
+                    ps.setLong(11, s.getTs());
                     ps.addBatch();
                 }
                 ps.executeBatch();
@@ -170,6 +153,7 @@ public class StatsStore {
                 SELECT COUNT(*)            AS total_requests,
                        SUM(input_tokens)   AS total_input_tokens,
                        SUM(output_tokens) AS total_output_tokens,
+                       SUM(lines_changed)  AS total_lines_changed,
                        AVG(cost)           AS avg_cost,
                        SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) AS success_count,
                        MAX(ts)             AS last_ts
@@ -189,11 +173,12 @@ public class StatsStore {
                        COUNT(*)        AS requests,
                        SUM(input_tokens)  AS input_tokens,
                        SUM(output_tokens) AS output_tokens,
+                       SUM(lines_changed) AS lines_changed,
                        AVG(cost)         AS avg_cost,
                        AVG(CASE WHEN cost > 0 THEN output_tokens * 1000.0 / cost END) AS tps
                 FROM request_stat
                 WHERE 1=1
-                """.formatted(bucketSeconds, bucketSeconds));
+                """.formatted(bucketSeconds * 1000, bucketSeconds * 1000));
         List<Object> args = new ArrayList<>();
         if (from != null) {
             sql.append(" AND ts >= ?");
@@ -212,6 +197,7 @@ public class StatsStore {
                        COUNT(*)            AS requests,
                        SUM(input_tokens)   AS input_tokens,
                        SUM(output_tokens)  AS output_tokens,
+                       SUM(lines_changed)  AS lines_changed,
                        AVG(cost)           AS avg_cost
                 FROM request_stat
                 GROUP BY model
@@ -229,6 +215,7 @@ public class StatsStore {
                        COUNT(*)            AS requests,
                        SUM(input_tokens)   AS input_tokens,
                        SUM(output_tokens)  AS output_tokens,
+                       SUM(lines_changed)  AS lines_changed,
                        AVG(cost)           AS avg_cost,
                        SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) AS success_count,
                        MAX(ts)             AS last_ts
@@ -246,7 +233,7 @@ public class StatsStore {
     public List<Map<String, Object>> userRecords(String user, int page, int size) {
         String sql = """
                 SELECT log_id, model, stream, input_tokens, output_tokens,
-                       cost, stop_reason, success, ts
+                       lines_changed, cost, stop_reason, success, ts
                 FROM request_stat
                 WHERE user = ?
                 ORDER BY ts DESC
@@ -264,11 +251,12 @@ public class StatsStore {
                        COUNT(*)        AS requests,
                        SUM(input_tokens)  AS input_tokens,
                        SUM(output_tokens) AS output_tokens,
+                       SUM(lines_changed) AS lines_changed,
                        AVG(cost)         AS avg_cost,
                        AVG(CASE WHEN cost > 0 THEN output_tokens * 1000.0 / cost END) AS tps
                 FROM request_stat
                 WHERE user = ?
-                """.formatted(bucketSeconds, bucketSeconds));
+                """.formatted(bucketSeconds * 1000, bucketSeconds * 1000));
         List<Object> args = new ArrayList<>();
         args.add(user);
         if (from != null) {
@@ -285,7 +273,7 @@ public class StatsStore {
     public List<Map<String, Object>> recordsPaged(Long from, Long to, String model, int page, int size) {
         StringBuilder sql = new StringBuilder(
                 "SELECT log_id, user, model, stream, input_tokens, output_tokens, " +
-                "cost, stop_reason, success, ts FROM request_stat WHERE 1=1");
+                "lines_changed, cost, stop_reason, success, ts FROM request_stat WHERE 1=1");
         List<Object> args = new ArrayList<>();
         if (from != null) {
             sql.append(" AND ts >= ?");

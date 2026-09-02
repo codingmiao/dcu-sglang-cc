@@ -33,15 +33,18 @@ public class ConcurrencyGate {
 
     private Semaphore concurrency;
     private Semaphore queue;
+    // clamp 后的配置值：active()/queued() 用它做减法，避免配置为 0 时出现负数（#10）
+    private int maxConcurrency;
+    private int queueSize;
 
     @PostConstruct
     public void init() {
-        int max = Math.max(1, config.getMaxConcurrency());
-        int q = Math.max(0, config.getQueueSize());
-        concurrency = new Semaphore(max, true);
-        queue = new Semaphore(q, true);
+        maxConcurrency = Math.max(1, config.getMaxConcurrency());
+        queueSize = Math.max(0, config.getQueueSize());
+        concurrency = new Semaphore(maxConcurrency, true);
+        queue = new Semaphore(queueSize, true);
         log.info("并发门就绪: maxConcurrency={}, queueSize={}, queueWaitTimeout={}s",
-                max, q, config.getQueueWaitTimeout());
+                maxConcurrency, queueSize, config.getQueueWaitTimeout());
     }
 
     /**
@@ -87,12 +90,12 @@ public class ConcurrencyGate {
 
     /** 当前在途请求数（已持有并发许可） */
     public int active() {
-        return config.getMaxConcurrency() - concurrency.availablePermits();
+        return maxConcurrency - concurrency.availablePermits();
     }
 
     /** 当前排队请求数（已占排队许可、等待并发许可） */
     public int queued() {
-        return config.getQueueSize() - queue.availablePermits();
+        return queueSize - queue.availablePermits();
     }
 
     /** 供 /stats/overview 暴露的快照 */

@@ -1,5 +1,6 @@
 package org.wowtools.dcu.stats;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -7,7 +8,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.wowtools.dcu.config.DcuConfiguration;
-import org.wowtools.dcu.pojo.AnthropicMessageRequest;
 import org.wowtools.dcu.pojo.AnthropicMessageResponse;
 import org.wowtools.dcu.util.Constant;
 
@@ -43,13 +43,14 @@ public class JsonlLogService {
 
     private static final int BATCH_SIZE = 100;
     private static final long FLUSH_INTERVAL_MS = 5000;
+    private static final int QUEUE_CAPACITY = 10000;
     private static final DateTimeFormatter FILE_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
     private final DcuConfiguration config;
     private final ServiceMetrics metrics;
     private final ObjectMapper objectMapper = Constant.objectMapper;
 
-    private final BlockingQueue<LogEntry> entryQueue = new LinkedBlockingQueue<>();
+    private final BlockingQueue<LogEntry> entryQueue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
 
     private volatile boolean running = true;
     private Thread consumerThread;
@@ -67,7 +68,7 @@ public class JsonlLogService {
     /**
      * 业务接口：仅入队。
      */
-    public void record(String logId, String user, AnthropicMessageRequest request,
+    public void record(String logId, String user, JsonNode request,
                        AnthropicMessageResponse response, long cost) {
         if (!running) {
             return;
@@ -197,7 +198,7 @@ public class JsonlLogService {
             String timestamp,
             String logId,
             String user,
-            AnthropicMessageRequest request,
+            JsonNode request,
             AnthropicMessageResponse response,
             Long cost
     ) {

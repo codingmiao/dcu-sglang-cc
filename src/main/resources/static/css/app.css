@@ -15,12 +15,23 @@ nav a:hover { color: #fff; }
 .muted { color: #9aa0a6; font-size: 12px; }
 .wrap { padding: 20px 24px; max-width: 1240px; margin: 0 auto; }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-         gap: 14px; margin-bottom: 20px; }
+.cards { display: grid; grid-template-columns: repeat(6, 1fr);
+         gap: 14px; margin-bottom: 14px; }
+@media (max-width: 900px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 560px) { .cards { grid-template-columns: repeat(2, 1fr); } }
 .card { background: #fff; border-radius: 10px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .card .label { font-size: 13px; color: #6b7280; }
 .card .value { font-size: 24px; font-weight: 700; margin-top: 6px; }
 .card .sub { font-size: 12px; color: #9aa0a6; margin-top: 4px; }
+
+/* 服务状态条（从概览卡片里拆出来，避免和指标卡挤在一行） */
+.status-bar { display: flex; align-items: center; gap: 10px; background: #fff;
+              border-radius: 10px; padding: 10px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+              margin-bottom: 20px; font-size: 13px; }
+.status-bar .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.status-bar .dot.on { background: #2ea043; }
+.status-bar .dot.off { background: #d1242f; }
+.status-bar .st { font-weight: 600; }
 
 .panel { background: #fff; border-radius: 10px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.08);
          margin-bottom: 20px; }

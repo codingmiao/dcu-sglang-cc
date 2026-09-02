@@ -35,7 +35,11 @@ public class ServletUtil {
             response.getWriter().flush();
         } catch (Exception e) {
             log.error("Non-stream request error", e);
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
+            // 响应已提交（常见于客户端中途断开）时不能再 sendError，否则会抛
+            // IllegalStateException 掩盖原始异常（#11）
+            if (!response.isCommitted()) {
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Internal server error");
+            }
         }
     }
 }

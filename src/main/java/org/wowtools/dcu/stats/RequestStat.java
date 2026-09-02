@@ -27,6 +27,9 @@ public class RequestStat {
     /** 输出 token */
     private int outputTokens;
 
+    /** 改动行数（Write/Edit 工具，见 {@link LinesChangedCalculator}） */
+    private int linesChanged;
+
     /** 耗时（ms） */
     private long cost;
 

@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,7 +12,10 @@ import org.wowtools.dcu.pojo.AnthropicMessageRequest;
 import org.wowtools.dcu.service.ConcurrencyGate;
 import org.wowtools.dcu.service.DcuService;
 import org.wowtools.dcu.service.UserRegistry;
+import org.wowtools.dcu.stats.UnmodeledFieldObserver;
 import org.wowtools.dcu.util.Constant;
+
+import java.util.UUID;
 
 /**
  * Anthropic /v1/messages 代理入口。
@@ -29,15 +31,19 @@ public class AnthropicController {
     private final DcuService dcuService;
     private final UserRegistry userRegistry;
     private final ConcurrencyGate gate;
+    private final UnmodeledFieldObserver unmodeledFieldObserver;
 
-    @PostMapping(value = "/messages", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping("/messages")
     public void messages(@RequestBody String body,
                          HttpServletRequest request,
                          HttpServletResponse response) throws Exception {
-//        String apiKey = request.getHeader("x-api-key");
-        String apiKey = request.getHeader("authorization");
-        if (null != apiKey) {
-            apiKey = apiKey.replaceFirst("Bearer ","").trim();
+        // 两种鉴权头都支持：x-api-key（Anthropic 官方，裸 key）优先，其次 Authorization: Bearer
+        String apiKey = request.getHeader("x-api-key");
+        if (apiKey == null) {
+            String auth = request.getHeader("authorization");
+            if (auth != null) {
+                apiKey = auth.replaceFirst("Bearer ", "").trim();
+            }
         }
         if (!userRegistry.isValid(apiKey)) {
             response.setStatus(401);
@@ -61,7 +67,10 @@ public class AnthropicController {
         try {
             AnthropicMessageRequest anthropicMessageRequest =
                     Constant.objectMapper.readValue(body, AnthropicMessageRequest.class);
-            dcuService.handle(anthropicMessageRequest, user, response);
+            // logId 在此生成并贯穿：观测的 sampleLogId 与 jsonl/统计记录用同一个，可关联回查
+            String logId = UUID.randomUUID().toString();
+            unmodeledFieldObserver.record(logId, anthropicMessageRequest);
+            dcuService.handle(anthropicMessageRequest, user, logId, response);
         } finally {
             gate.release();
         }

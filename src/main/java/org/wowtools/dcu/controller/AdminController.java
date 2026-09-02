@@ -1,5 +1,6 @@
 package org.wowtools.dcu.controller;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import org.wowtools.dcu.stats.UserStore;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 管理员接口：登录 / 登出 / 用户维护。
@@ -29,24 +31,63 @@ import java.util.Map;
 public class AdminController {
 
     private static final String SESSION_KEY = "dcu.admin";
+    // 登录失败限制（#15）：同一用户名连续失败 N 次后锁定 LOCK_MS
+    private static final int MAX_FAILS = 5;
+    private static final long LOCK_MS = 5 * 60 * 1000L;
 
     private final DcuConfiguration config;
     private final UserStore userStore;
     private final UserRegistry userRegistry;
 
+    // 按用户名记录失败次数与锁定截止时间（内存态，重启即清零）
+    private final Map<String, int[]> failCount = new ConcurrentHashMap<>();
+    private final Map<String, Long> lockUntil = new ConcurrentHashMap<>();
+
     /** 登录 */
     @PostMapping("/login")
-    public Map<String, Object> login(@RequestBody Map<String, String> body, HttpSession session) {
+    public Map<String, Object> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String username = body.get("username");
         String password = body.get("password");
         DcuConfiguration.Admin admin = config.getAdmin();
         Map<String, Object> m = new LinkedHashMap<>();
+
+        // 锁定中：即使密码正确也拒绝（#15）
+        Long until = lockUntil.get(username);
+        if (until != null && until > System.currentTimeMillis()) {
+            m.put("ok", false);
+            m.put("message", "登录失败次数过多，请 " + (until - System.currentTimeMillis()) / 1000 + " 秒后再试");
+            return m;
+        }
+
         if (admin.getUsername().equals(username) && admin.getPassword().equals(password)) {
-            session.setAttribute(SESSION_KEY, true);
+            // 登录成功：清失败计数，并重建 session 防 session fixation（#15）
+            failCount.remove(username);
+            lockUntil.remove(username);
+            HttpSession old = request.getSession(false);
+            if (old != null) {
+                old.invalidate();
+            }
+            HttpSession fresh = request.getSession(true);
+            fresh.setAttribute(SESSION_KEY, true);
             m.put("ok", true);
         } else {
-            m.put("ok", false);
-            m.put("message", "用户名或密码错误");
+            int[] counter = failCount.compute(username, (k, v) -> {
+                if (v == null) {
+                    return new int[]{1};
+                }
+                v[0]++;
+                return v;
+            });
+            int fails = counter[0];
+            if (fails >= MAX_FAILS) {
+                lockUntil.put(username, System.currentTimeMillis() + LOCK_MS);
+                failCount.remove(username);
+                m.put("ok", false);
+                m.put("message", "登录失败次数过多，已锁定 5 分钟");
+            } else {
+                m.put("ok", false);
+                m.put("message", "用户名或密码错误");
+            }
         }
         return m;
     }
@@ -119,8 +160,8 @@ public class AdminController {
             String name = (String) body.get("name");
             Integer enabled = body.get("enabled") == null ? null : ((Number) body.get("enabled")).intValue();
             if (Boolean.TRUE.equals(body.get("resetKey"))) {
-                String key = userStore.resetKey(id);
-                userStore.update(id, name, null, enabled);
+                // 重置 key 与改 name/enabled 合并为单事务（#13），避免中间态
+                String key = userStore.updateWithKey(id, name, userStore.generateKey(), enabled);
                 m.put("ok", true);
                 m.put("newKey", key);
             } else {
