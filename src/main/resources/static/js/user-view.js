@@ -47,7 +47,7 @@ window.UserView = {
         </div>
         <h3 style="margin-top:14px">最近调用记录</h3>
         <table>
-          <thead><tr><th>时间</th><th>logId</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>改动</th><th>耗时</th><th>stop</th><th>结果</th></tr></thead>
+          <thead><tr><th>时间</th><th>logId</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>改动</th><th>耗时</th><th>stop</th><th>结果</th><th>失败原因</th></tr></thead>
           <tbody>
             <tr v-for="r in records" :key="r.log_id" class="clickable" @click="openRecord(r.log_id)">
               <td>{{ Dcu.ts(r.ts) }}</td>
@@ -60,6 +60,7 @@ window.UserView = {
               <td>{{ Dcu.fmtMs(r.cost) }} ms</td>
               <td class="muted">{{ r.stop_reason || '-' }}</td>
               <td><span class="tag" :class="r.success==1?'ok':'bad'">{{ r.success==1?'成功':'失败' }}</span></td>
+              <td class="muted err-cell" :title="r.error">{{ r.success==1 ? '-' : (r.error || '未知') }}</td>
             </tr>
           </tbody>
         </table>
@@ -127,10 +128,7 @@ window.UserView = {
         '/trend?bucketSeconds=' + r.bucket + (from ? '&from=' + from : ''));
       this.$nextTick(() => {
         const series = this.series.map(s => ({ ...s, visible: !this.hidden[s.key] }));
-        const now = Date.now();
-        const xDomain = from ? [from, now] : null;
-        Dcu.lineChart(this.$refs.trend, res.data || [], 'bucket', series, {
-          xDomain,
+        Dcu.groupedBarChart(this.$refs.trend, res.data || [], 'bucket', series, {
           onToggle: (key, vis) => { this.hidden[key] = !vis; },
         });
       });

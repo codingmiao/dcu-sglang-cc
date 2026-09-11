@@ -12,9 +12,19 @@ spring:
 
 logging:
   level:
-    root: INFO
+    root: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+  # 生产日志文件（相对工作目录，可用 LOG_FILE 覆盖）。
+  # 不设此项时 Spring Boot 只输出到控制台——打包后若进程管理器不捕获 stdout，
+  # 就"看不到日志"。设了之后控制台与文件同时输出，文件按大小+天滚动。
+  file:
+    name: ${LOG_FILE:logs/dcu-sglang-cc.log}
+  logback:
+    rollingpolicy:
+      max-file-size: 50MB
+      max-history: 30
+      total-size-cap: 2GB
 
 dcu:
   # 超时（秒）
@@ -58,7 +68,3 @@ dcu:
 
   # 可用用户（首次启动 seed 到 user 表；之后在管理页维护）
   users:
-    - name: "alice"
-      api-key: "key-alice"
-    - name: "bob"
-      api-key: "key-bob"

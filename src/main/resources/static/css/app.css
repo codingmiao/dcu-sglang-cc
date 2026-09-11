@@ -45,6 +45,8 @@ th { color: #6b7280; font-weight: 600; }
 tr.clickable { cursor: pointer; }
 tr.clickable:hover { background: #f7f9fc; }
 tr.expanded { background: #eef4ff; }
+/* 失败原因列：可能很长（上游错误体），单行截断，hover 看全文（title） */
+td.err-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bar-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; font-size: 12px; }
 .bar-name { width: 110px; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -84,6 +86,25 @@ pre.json { background: #0d1117; color: #c9d1d9; padding: 14px; border-radius: 8p
            word-break: break-word; }
 .notice { padding: 14px; background: #fff8e6; border: 1px solid #f0d98c; border-radius: 8px;
           color: #7a5b00; font-size: 13px; }
+
+/* 记录弹层选项卡：关键信息 / 原始 JSON */
+.tabs { display: flex; gap: 4px; margin: 4px 0 12px; border-bottom: 1px solid #eef0f2; }
+.tab { border: none; background: none; padding: 7px 14px; font-size: 13px; cursor: pointer;
+       color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.active { color: #1f6feb; border-bottom-color: #1f6feb; font-weight: 600; }
+.sec { font-size: 13px; margin: 14px 0 8px; color: #374151; }
+.kv { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+.fold { margin: 6px 0; }
+.fold summary { cursor: pointer; font-size: 12px; color: #6b7280; user-select: none; }
+.fold[open] summary { margin-bottom: 6px; }
+.msg { border: 1px solid #eef0f2; border-radius: 8px; padding: 10px 12px; margin: 8px 0;
+       background: #fafbfc; }
+.msg .role { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em;
+            margin-bottom: 6px; }
+.msg.user .role { color: #1a7f37; }
+.msg.assistant .role { color: #1f6feb; }
+.msg.resp .role { color: #8250df; }
+.msg .content { font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
 
 /* 表单 */
 .form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }

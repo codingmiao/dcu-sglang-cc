@@ -67,9 +67,11 @@ public class JsonlLogService {
 
     /**
      * 业务接口：仅入队。
+     *
+     * @param error 失败原因（成功时为 null），与统计表的 error 列同源
      */
     public void record(String logId, String user, JsonNode request,
-                       AnthropicMessageResponse response, long cost) {
+                       AnthropicMessageResponse response, long cost, String error) {
         if (!running) {
             return;
         }
@@ -79,7 +81,8 @@ public class JsonlLogService {
                 user,
                 request,
                 response,
-                cost
+                cost,
+                error
         );
         boolean success = entryQueue.offer(entry);
         metrics.setQueueDepth(entryQueue.size());
@@ -200,7 +203,8 @@ public class JsonlLogService {
             String user,
             JsonNode request,
             AnthropicMessageResponse response,
-            Long cost
+            Long cost,
+            String error
     ) {
     }
 }

@@ -39,6 +39,9 @@ public class RequestStat {
     /** 是否成功 */
     private boolean success;
 
+    /** 失败原因（成功时为 null）：上游错误带状态码与错误体、客户端断开、内部异常等 */
+    private String error;
+
     /** 记录时间（epoch millis） */
     private long ts;
 }

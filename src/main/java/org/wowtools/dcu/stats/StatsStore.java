@@ -105,8 +105,8 @@ public class StatsStore {
         }
         String sql = """
                 INSERT INTO request_stat
-                (log_id, user, model, stream, input_tokens, output_tokens, lines_changed, cost, stop_reason, success, ts)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                (log_id, user, model, stream, input_tokens, output_tokens, lines_changed, cost, stop_reason, success, error, ts)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                 """;
         try (Connection c = sqlite.open()) {
             c.setAutoCommit(false);
@@ -122,7 +122,8 @@ public class StatsStore {
                     ps.setLong(8, s.getCost());
                     ps.setString(9, s.getStopReason());
                     ps.setInt(10, s.isSuccess() ? 1 : 0);
-                    ps.setLong(11, s.getTs());
+                    ps.setString(11, s.getError());
+                    ps.setLong(12, s.getTs());
                     ps.addBatch();
                 }
                 ps.executeBatch();
@@ -156,6 +157,7 @@ public class StatsStore {
                        SUM(lines_changed)  AS total_lines_changed,
                        AVG(cost)           AS avg_cost,
                        SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) AS success_count,
+                       SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) AS fail_count,
                        MAX(ts)             AS last_ts
                 FROM request_stat
                 """;
@@ -208,6 +210,7 @@ public class StatsStore {
 
     /**
      * 用户分页表：各用户请求数、token、耗时、成功率、最近活跃。
+     * 按最近活跃时间倒序；last_ts 相同的用户按用户名升序兜底，保证分页顺序稳定。
      */
     public List<Map<String, Object>> usersPaged(int page, int size) {
         String sql = """
@@ -221,7 +224,7 @@ public class StatsStore {
                        MAX(ts)             AS last_ts
                 FROM request_stat
                 GROUP BY user
-                ORDER BY (input_tokens + output_tokens) DESC
+                ORDER BY last_ts DESC, user ASC
                 LIMIT ? OFFSET ?
                 """;
         return query(sql, size, page * size);
@@ -233,7 +236,7 @@ public class StatsStore {
     public List<Map<String, Object>> userRecords(String user, int page, int size) {
         String sql = """
                 SELECT log_id, model, stream, input_tokens, output_tokens,
-                       lines_changed, cost, stop_reason, success, ts
+                       lines_changed, cost, stop_reason, success, error, ts
                 FROM request_stat
                 WHERE user = ?
                 ORDER BY ts DESC
@@ -273,7 +276,7 @@ public class StatsStore {
     public List<Map<String, Object>> recordsPaged(Long from, Long to, String model, int page, int size) {
         StringBuilder sql = new StringBuilder(
                 "SELECT log_id, user, model, stream, input_tokens, output_tokens, " +
-                "lines_changed, cost, stop_reason, success, ts FROM request_stat WHERE 1=1");
+                "lines_changed, cost, stop_reason, success, error, ts FROM request_stat WHERE 1=1");
         List<Object> args = new ArrayList<>();
         if (from != null) {
             sql.append(" AND ts >= ?");

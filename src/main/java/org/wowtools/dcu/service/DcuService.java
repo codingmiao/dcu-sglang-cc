@@ -69,10 +69,10 @@ public class DcuService {
                 stopReason = fullResponse.getStopReason();
             }
 
-            recordStat(logId, user, originalRequest, fullResponse, cost, stream, success, stopReason);
+            recordStat(logId, user, originalRequest, fullResponse, cost, stream, success, stopReason, null);
         } catch (Exception e) {
             long cost = System.currentTimeMillis() - start;
-            recordStat(logId, user, originalRequest, null, cost, stream, false, null);
+            recordStat(logId, user, originalRequest, null, cost, stream, false, null, describeError(e));
             if (e instanceof ClientGoneException) {
                 // 客户端主动断开（#12）：上游已 cancel，属正常情况，INFO 记录、不写错误响应
                 log.info("id:{}\tuser:{}\tstream:{}\t客户端断开，请求中止", logId, user, stream);
@@ -257,7 +257,7 @@ public class DcuService {
 
     private void recordStat(String logId, String user, JsonNode originalRequest,
                            AnthropicMessageResponse res, long cost, boolean stream,
-                           boolean success, String stopReason) {
+                           boolean success, String stopReason, String error) {
         int inTok = 0, outTok = 0;
         if (res != null && res.getUsage() != null) {
             inTok = res.getUsage().getInputTokens();
@@ -278,10 +278,40 @@ public class DcuService {
         stat.setCost(cost);
         stat.setStopReason(stopReason);
         stat.setSuccess(success);
+        stat.setError(error);
         stat.setTs(System.currentTimeMillis());
         statsStore.insert(stat);
 
-        jsonlLogService.record(logId, user, originalRequest, res, cost);
+        jsonlLogService.record(logId, user, originalRequest, res, cost, error);
+    }
+
+    /**
+     * 把失败异常归一成可落库的简短原因（截断到 500 字符，避免撑大统计行）：
+     * 客户端断开 / 上游错误（状态码 + 错误体）/ 内部异常（根因类型 + message）。
+     *
+     * <p>内部异常取<b>根因</b>而非最外层：SglangClient 会把底层异常包成
+     * {@code RuntimeException("sglang 非流式请求异常[logId]", cause)}，外层 message 只有 logId，
+     * 真正的失败原因（如 connection refused / timeout）在 cause 链底端。
+     */
+    private String describeError(Throwable e) {
+        String msg;
+        if (e instanceof ClientGoneException) {
+            msg = "客户端断开";
+        } else {
+            UpstreamException upstream = unwrapUpstream(e);
+            if (upstream != null) {
+                msg = "上游错误 HTTP " + upstream.getStatus() + ": "
+                        + (upstream.getBody() == null ? "" : upstream.getBody());
+            } else {
+                Throwable root = e;
+                while (root.getCause() != null && root.getCause() != root) {
+                    root = root.getCause();
+                }
+                String detail = root.getMessage();
+                msg = root.getClass().getSimpleName() + (detail == null || detail.isBlank() ? "" : ": " + detail);
+            }
+        }
+        return msg.length() > 500 ? msg.substring(0, 500) : msg;
     }
 
     /**

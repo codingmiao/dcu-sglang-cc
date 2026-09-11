@@ -93,6 +93,7 @@ public class JsonlLookupService {
                         m.put("cost", node.path("cost").asLong());
                         m.put("request", node.get("request"));
                         m.put("response", node.get("response"));
+                        m.put("error", node.get("error"));
                         m.put("sourceFile", file.getFileName().toString());
                         return m;
                     }

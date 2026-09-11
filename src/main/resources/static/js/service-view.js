@@ -7,7 +7,7 @@ window.ServiceView = {
     <div class="cards">
       <div class="card"><div class="label">总请求数</div><div class="value">{{ Dcu.fmt(ov.total_requests) }}</div></div>
       <div class="card"><div class="label">成功 / 失败</div>
-        <div class="value">{{ Dcu.fmt(ov.success_count) }} / {{ Dcu.fmt(ov.total_requests) - Dcu.fmt(ov.success_count) }}</div></div>
+        <div class="value">{{ Dcu.fmt(ov.success_count) }} / {{ Dcu.fmt(ov.fail_count) }}</div></div>
       <div class="card"><div class="label">输入 tokens</div><div class="value">{{ Dcu.fmt(ov.total_input_tokens) }}</div></div>
       <div class="card"><div class="label">输出 tokens</div><div class="value">{{ Dcu.fmt(ov.total_output_tokens) }}</div></div>
       <div class="card"><div class="label">改动行数</div><div class="value">{{ Dcu.fmt(ov.total_lines_changed) }}</div></div>
@@ -21,7 +21,7 @@ window.ServiceView = {
       <span class="muted">运行 {{ uptime }} · 在途 {{ svc.inFlight }} · 队列 {{ svc.queueDepth }}</span>
     </div>
 
-    <!-- 请求趋势（折线图，可下钻） -->
+    <!-- 请求趋势（分组柱状图，可下钻） -->
     <div class="panel">
       <h2>请求趋势
         <span class="range">
@@ -46,7 +46,7 @@ window.ServiceView = {
       <h2>请求明细 <span class="muted">（{{ drill.title }}）</span>
         <a class="muted" style="float:right;cursor:pointer" @click="drill=null">关闭</a></h2>
       <table>
-        <thead><tr><th>时间</th><th>用户</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>改动</th><th>耗时</th><th>结果</th></tr></thead>
+        <thead><tr><th>时间</th><th>用户</th><th>模型</th><th>流式</th><th>输入</th><th>输出</th><th>改动</th><th>耗时</th><th>结果</th><th>失败原因</th></tr></thead>
         <tbody>
           <tr v-for="r in drill.rows" :key="r.log_id" class="clickable" @click="openRecord(r.log_id)">
             <td>{{ Dcu.ts(r.ts) }}</td>
@@ -58,6 +58,7 @@ window.ServiceView = {
             <td>{{ Dcu.fmt(r.lines_changed) }}</td>
             <td>{{ Dcu.fmtMs(r.cost) }} ms</td>
             <td><span class="tag" :class="r.success==1?'ok':'bad'">{{ r.success==1?'成功':'失败' }}</span></td>
+            <td class="muted err-cell" :title="r.error">{{ r.success==1 ? '-' : (r.error || '未知') }}</td>
           </tr>
         </tbody>
       </table>
@@ -122,10 +123,7 @@ window.ServiceView = {
         this.$nextTick(() => {
           if (gen !== this._gen) return;
           const series = this.series.map(s => ({ ...s, visible: !this.hidden[s.key] }));
-          const now = Date.now();
-          const xDomain = from ? [from, now] : null;
-          Dcu.lineChart(this.$refs.trend, this.byTime, 'bucket', series, {
-            xDomain,
+          Dcu.groupedBarChart(this.$refs.trend, this.byTime, 'bucket', series, {
             onClick: (d) => this.drillTime(d),
             onToggle: (key, vis) => { this.hidden[key] = !vis; },
           });
