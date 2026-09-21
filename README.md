@@ -34,6 +34,36 @@
   的分隔文本以 `text_delta` 塞进第一个 `tool_use` 块的 index，导致 Claude Code 报
   `Content block is not a text block`。`StreamFix` 丢弃与所在块类型不匹配的 delta
 
+## sglang 适配器补丁（`sglang-patch/`）
+
+sglang **v0.5.12** 的 Anthropic 适配器（`srt/entrypoints/anthropic/`）有两个缺陷，
+**v0.5.14 才修复**：
+
+1. **缓存命中不报**：`--enable-cache-report` 开启后，OpenAI 端点会返回
+   `prompt_tokens_details.cached_tokens`，但 Anthropic 端点从不把它转成
+   `cache_read_input_tokens`，统计页看不到任何命中
+2. **思考内容不输出**：`--reasoning-parser qwen3` 解析出的 `reasoning_content`
+   被适配器丢弃，Anthropic 端点拿不到模型的思考内容
+
+`sglang-patch/` 里是参考 v0.5.14 实现、对 v0.5.12 两个文件做的最小化补丁：
+
+| 文件 | 覆盖到容器内 | 改动 |
+|---|---|---|
+| `serving.py` | `.../sglang/srt/entrypoints/anthropic/serving.py` | 新增 `_anthropic_usage()`：`input_tokens` 改为"未命中部分"（prompt − cached），命中部分单独放 `cache_read_input_tokens`（非流式 + 流式 `message_delta` 都带）；非流式响应加 `thinking` 块；流式加 `thinking_delta` 事件（含正确的 block start/stop 序列） |
+| `protocol.py` | `.../sglang/srt/entrypoints/anthropic/protocol.py` | `AnthropicDelta` 增加 `thinking_delta` 类型与 `thinking` 字段 |
+
+> 语义变化（与 v0.5.14 一致）：`input_tokens` 是**未命中部分**，
+> 总输入 = `input_tokens + cache_read_input_tokens`。
+> 本代理的缓存命中率统计按此口径计算。
+
+**部署方式**：sglang 容器每次启动都删除重建，`docker cp` 进去的文件会丢，
+所以补丁文件放在宿主机 `/mydata/sglang-patch/`，启动脚本
+（`/mydata/start/sglang_qwen38_chat_min.sh`）挂载该目录并在容器启动时
+`cp` 覆盖到 sglang 安装目录，每次重启自动重新打补丁。
+
+升级 sglang 到 ≥0.5.14 后本补丁不再需要（官方已含这两处修复），
+届时删掉启动脚本里的挂载与 `cp` 两行即可。
+
 ## 架构
 
 ### 请求主链路
