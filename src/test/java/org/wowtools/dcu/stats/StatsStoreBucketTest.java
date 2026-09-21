@@ -40,6 +40,7 @@ class StatsStoreBucketTest {
                         model         TEXT,
                         stream        INTEGER,
                         input_tokens  INTEGER,
+                        cache_read_input_tokens INTEGER,
                         output_tokens INTEGER,
                         lines_changed INTEGER,
                         cost          INTEGER,

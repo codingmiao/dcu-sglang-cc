@@ -105,8 +105,9 @@ public class StatsStore {
         }
         String sql = """
                 INSERT INTO request_stat
-                (log_id, user, model, stream, input_tokens, output_tokens, lines_changed, cost, stop_reason, success, error, ts)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                (log_id, user, model, stream, input_tokens, cache_read_input_tokens, output_tokens,
+                 lines_changed, cost, stop_reason, success, error, ts)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """;
         try (Connection c = sqlite.open()) {
             c.setAutoCommit(false);
@@ -117,13 +118,14 @@ public class StatsStore {
                     ps.setString(3, s.getModel());
                     ps.setInt(4, s.isStream() ? 1 : 0);
                     ps.setInt(5, s.getInputTokens());
-                    ps.setInt(6, s.getOutputTokens());
-                    ps.setInt(7, s.getLinesChanged());
-                    ps.setLong(8, s.getCost());
-                    ps.setString(9, s.getStopReason());
-                    ps.setInt(10, s.isSuccess() ? 1 : 0);
-                    ps.setString(11, s.getError());
-                    ps.setLong(12, s.getTs());
+                    ps.setInt(6, s.getCacheReadInputTokens());
+                    ps.setInt(7, s.getOutputTokens());
+                    ps.setInt(8, s.getLinesChanged());
+                    ps.setLong(9, s.getCost());
+                    ps.setString(10, s.getStopReason());
+                    ps.setInt(11, s.isSuccess() ? 1 : 0);
+                    ps.setString(12, s.getError());
+                    ps.setLong(13, s.getTs());
                     ps.addBatch();
                 }
                 ps.executeBatch();
@@ -153,11 +155,13 @@ public class StatsStore {
         String sql = """
                 SELECT COUNT(*)            AS total_requests,
                        SUM(input_tokens)   AS total_input_tokens,
+                       SUM(COALESCE(cache_read_input_tokens,0)) AS total_cache_read_input_tokens,
                        SUM(output_tokens) AS total_output_tokens,
                        SUM(lines_changed)  AS total_lines_changed,
                        AVG(cost)           AS avg_cost,
                        SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) AS success_count,
                        SUM(CASE WHEN success=0 THEN 1 ELSE 0 END) AS fail_count,
+                       SUM(CASE WHEN COALESCE(cache_read_input_tokens,0) > 0 THEN 1 ELSE 0 END) AS cache_hit_count,
                        MAX(ts)             AS last_ts
                 FROM request_stat
                 """;
@@ -174,6 +178,7 @@ public class StatsStore {
                 SELECT (ts / %d) * %d AS bucket,
                        COUNT(*)        AS requests,
                        SUM(input_tokens)  AS input_tokens,
+                       SUM(COALESCE(cache_read_input_tokens,0)) AS cache_read_input_tokens,
                        SUM(output_tokens) AS output_tokens,
                        SUM(lines_changed) AS lines_changed,
                        AVG(cost)         AS avg_cost,
@@ -198,6 +203,7 @@ public class StatsStore {
                 SELECT model,
                        COUNT(*)            AS requests,
                        SUM(input_tokens)   AS input_tokens,
+                       SUM(COALESCE(cache_read_input_tokens,0)) AS cache_read_input_tokens,
                        SUM(output_tokens)  AS output_tokens,
                        SUM(lines_changed)  AS lines_changed,
                        AVG(cost)           AS avg_cost
@@ -217,10 +223,12 @@ public class StatsStore {
                 SELECT user,
                        COUNT(*)            AS requests,
                        SUM(input_tokens)   AS input_tokens,
+                       SUM(COALESCE(cache_read_input_tokens,0)) AS cache_read_input_tokens,
                        SUM(output_tokens)  AS output_tokens,
                        SUM(lines_changed)  AS lines_changed,
                        AVG(cost)           AS avg_cost,
                        SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) AS success_count,
+                       SUM(CASE WHEN COALESCE(cache_read_input_tokens,0) > 0 THEN 1 ELSE 0 END) AS cache_hit_count,
                        MAX(ts)             AS last_ts
                 FROM request_stat
                 GROUP BY user
@@ -235,7 +243,7 @@ public class StatsStore {
      */
     public List<Map<String, Object>> userRecords(String user, int page, int size) {
         String sql = """
-                SELECT log_id, model, stream, input_tokens, output_tokens,
+                SELECT log_id, model, stream, input_tokens, cache_read_input_tokens, output_tokens,
                        lines_changed, cost, stop_reason, success, error, ts
                 FROM request_stat
                 WHERE user = ?
@@ -253,6 +261,7 @@ public class StatsStore {
                 SELECT (ts / %d) * %d AS bucket,
                        COUNT(*)        AS requests,
                        SUM(input_tokens)  AS input_tokens,
+                       SUM(COALESCE(cache_read_input_tokens,0)) AS cache_read_input_tokens,
                        SUM(output_tokens) AS output_tokens,
                        SUM(lines_changed) AS lines_changed,
                        AVG(cost)         AS avg_cost,
@@ -275,7 +284,7 @@ public class StatsStore {
      */
     public List<Map<String, Object>> recordsPaged(Long from, Long to, String model, int page, int size) {
         StringBuilder sql = new StringBuilder(
-                "SELECT log_id, user, model, stream, input_tokens, output_tokens, " +
+                "SELECT log_id, user, model, stream, input_tokens, cache_read_input_tokens, output_tokens, " +
                 "lines_changed, cost, stop_reason, success, error, ts FROM request_stat WHERE 1=1");
         List<Object> args = new ArrayList<>();
         if (from != null) {

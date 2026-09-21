@@ -172,18 +172,21 @@ class SchemaMigratorTest {
 
     /**
      * 用真实 classpath 迁移（V1 baseline + V2 lines_changed + V3 error
-     * + V4 user_max_concurrency）跑一遍，确认各版本加了对应列。
+     * + V4 user_max_concurrency + V5 cache_read_input_tokens）跑一遍，
+     * 确认各版本加了对应列。
      */
     @Test
     void realClasspathMigrationsAddLinesChanged() throws Exception {
         Sqlite sqlite = newSqlite();
         new SchemaMigrator(sqlite).migrate(); // 公共构造器 = 默认 classpath 位置
 
-        assertEquals(4, currentVersion(sqlite), "真实迁移应升到 v4");
+        assertEquals(5, currentVersion(sqlite), "真实迁移应升到 v5");
         assertTrue(hasColumn(sqlite, "request_stat", "lines_changed"), "V2 应加 lines_changed 列");
         assertTrue(hasColumn(sqlite, "request_stat", "error"), "V3 应加 error 列");
         assertTrue(hasColumn(sqlite, "request_stat", "log_id"), "V1 应建 request_stat 表");
         assertTrue(hasColumn(sqlite, "user", "api_key"), "V1 应建 user 表");
         assertTrue(hasColumn(sqlite, "user", "max_concurrency"), "V4 应加 user.max_concurrency 列");
+        assertTrue(hasColumn(sqlite, "request_stat", "cache_read_input_tokens"),
+                "V5 应加 request_stat.cache_read_input_tokens 列");
     }
 }

@@ -258,10 +258,14 @@ public class DcuService {
     private void recordStat(String logId, String user, JsonNode originalRequest,
                            AnthropicMessageResponse res, long cost, boolean stream,
                            boolean success, String stopReason, String error) {
-        int inTok = 0, outTok = 0;
+        int inTok = 0, outTok = 0, cacheTok = 0;
         if (res != null && res.getUsage() != null) {
             inTok = res.getUsage().getInputTokens();
             outTok = res.getUsage().getOutputTokens();
+            Object cache = res.getUsage().getCacheReadInputTokens();
+            if (cache instanceof Number n) {
+                cacheTok = n.intValue();
+            }
         }
         // 改动行数：从响应的 Write/Edit tool_use 块算（见 LinesChangedCalculator）
         int linesChanged = LinesChangedCalculator.calculate(res);
@@ -273,6 +277,7 @@ public class DcuService {
         stat.setModel(originalRequest.path("model").asText(null));
         stat.setStream(stream);
         stat.setInputTokens(inTok);
+        stat.setCacheReadInputTokens(cacheTok);
         stat.setOutputTokens(outTok);
         stat.setLinesChanged(linesChanged);
         stat.setCost(cost);
@@ -323,6 +328,7 @@ public class DcuService {
         private String model;
         private String stopReason;
         private int inputTokens;
+        private int cacheReadInputTokens;
         private int outputTokens;
         private final java.util.Map<Integer, AnthropicMessageResponse.ContentBlock> blocks = new java.util.LinkedHashMap<>();
         private final java.util.Map<Integer, StringBuilder> builders = new java.util.HashMap<>();
@@ -384,6 +390,8 @@ public class DcuService {
                     }
                     if (e.getUsage() != null) {
                         inputTokens = e.getUsage().getInputTokens() == null ? 0 : e.getUsage().getInputTokens();
+                        cacheReadInputTokens = e.getUsage().getCacheReadInputTokens() == null
+                                ? 0 : e.getUsage().getCacheReadInputTokens();
                         outputTokens = e.getUsage().getOutputTokens() == null ? 0 : e.getUsage().getOutputTokens();
                     }
                 }
@@ -421,6 +429,7 @@ public class DcuService {
             res.setContent(content);
             AnthropicMessageResponse.Usage usage = new AnthropicMessageResponse.Usage();
             usage.setInputTokens(inputTokens);
+            usage.setCacheReadInputTokens(cacheReadInputTokens);
             usage.setOutputTokens(outputTokens);
             res.setUsage(usage);
             return res;

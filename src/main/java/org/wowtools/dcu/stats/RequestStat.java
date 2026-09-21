@@ -21,8 +21,11 @@ public class RequestStat {
     /** 是否流式 */
     private boolean stream;
 
-    /** 输入 token */
+    /** 输入 token（sglang >= 0.5.14 语义为"未命中部分"，总输入 = 本字段 + cacheReadInputTokens） */
     private int inputTokens;
+
+    /** 缓存命中 token（sglang --enable-cache-report 开启后由 cache_read_input_tokens 上报） */
+    private int cacheReadInputTokens;
 
     /** 输出 token */
     private int outputTokens;

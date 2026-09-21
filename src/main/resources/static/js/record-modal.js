@@ -54,6 +54,7 @@ window.RecordModal = {
             <div v-if="resp" class="kv">
               <span v-if="resp.stop_reason">stop {{ resp.stop_reason }}</span>
               <span v-if="resp.usage">输入 {{ Dcu.fmt(resp.usage.input_tokens) }} · 输出 {{ Dcu.fmt(resp.usage.output_tokens) }}</span>
+              <span v-if="resp.usage && resp.usage.cache_read_input_tokens" class="cache-hit">缓存命中 {{ Dcu.fmt(resp.usage.cache_read_input_tokens) }}</span>
             </div>
             <div v-if="resp && (resp.content||[]).length">
               <div v-for="(b,i) in resp.content" :key="i" class="msg resp">

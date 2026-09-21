@@ -15,7 +15,7 @@ nav a:hover { color: #fff; }
 .muted { color: #9aa0a6; font-size: 12px; }
 .wrap { padding: 20px 24px; max-width: 1240px; margin: 0 auto; }
 
-.cards { display: grid; grid-template-columns: repeat(6, 1fr);
+.cards { display: grid; grid-template-columns: repeat(7, 1fr);
          gap: 14px; margin-bottom: 14px; }
 @media (max-width: 900px) { .cards { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 560px) { .cards { grid-template-columns: repeat(2, 1fr); } }
@@ -58,6 +58,9 @@ td.err-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white
 .tag.ok { background: #e6f4ea; color: #1a7f37; }
 .tag.bad { background: #fde8e8; color: #cf222e; }
 .tag.stream { background: #eef0f2; color: #57606a; }
+/* 缓存命中：命中时高亮（琥珀色），与"输入/输出"区分 */
+.cache-hit { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px;
+             background: #fff3e0; color: #b26a00; font-weight: 600; }
 
 .pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
 .pager button { border: 1px solid #d0d7de; background: #fff; border-radius: 6px; padding: 4px 12px;
