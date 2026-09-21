@@ -7,6 +7,7 @@ window.AdminView = {
       <div class="form">
         <div class="field"><label>用户名</label><input v-model="newName" placeholder="如 carol"></div>
         <div class="field"><label>apiKey（留空自动生成）</label><input v-model="newKey" placeholder="sk-..."></div>
+        <div class="field"><label>并发上限（默认 2）</label><input v-model.number="newMax" type="number" min="1" placeholder="2"></div>
         <button class="btn primary" @click="createUser">添加</button>
       </div>
     </div>
@@ -14,13 +15,19 @@ window.AdminView = {
     <div class="panel">
       <h2>用户列表</h2>
       <table>
-        <thead><tr><th>id</th><th>用户名</th><th>apiKey</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+        <thead><tr><th>id</th><th>用户名</th><th>apiKey</th><th>状态</th><th>并发上限</th><th>创建时间</th><th>操作</th></tr></thead>
         <tbody>
           <tr v-for="u in users" :key="u.id">
             <td class="muted">{{ u.id }}</td>
             <td>{{ u.name }}</td>
             <td class="muted" style="font-family:monospace">{{ u.api_key }}</td>
             <td><span class="tag" :class="u.enabled==1?'ok':'bad'">{{ u.enabled==1?'启用':'禁用' }}</span></td>
+            <td>
+              <div class="actions">
+                <input v-model.number="u._max" type="number" min="1" style="width:56px">
+                <button class="btn small" @click="saveMax(u)">保存</button>
+              </div>
+            </td>
             <td class="muted">{{ Dcu.ts(u.created_at) }}</td>
             <td>
               <div class="actions">
@@ -37,19 +44,31 @@ window.AdminView = {
   `,
   data() {
     return {
-      users: [], newName: '', newKey: '',
+      users: [], newName: '', newKey: '', newMax: 2,
     };
   },
   methods: {
     async loadUsers() {
       const r = await Dcu.get('/admin/users');
-      if (r.ok) this.users = r.data || [];
+      if (r.ok) {
+        this.users = (r.data || []).map(u => {
+          u._max = u.max_concurrency;
+          return u;
+        });
+      }
     },
     async createUser() {
       if (!this.newName) { Dcu.toast('请输入用户名'); return; }
-      const r = await Dcu.post('/admin/users', { name: this.newName, apiKey: this.newKey });
-      if (r.ok) { Dcu.toast('已添加 ' + this.newName); this.newName = ''; this.newKey = ''; this.loadUsers(); }
+      const r = await Dcu.post('/admin/users', { name: this.newName, apiKey: this.newKey, maxConcurrency: this.newMax });
+      if (r.ok) { Dcu.toast('已添加 ' + this.newName); this.newName = ''; this.newKey = ''; this.newMax = 2; this.loadUsers(); }
       else Dcu.toast(r.message || '添加失败');
+    },
+    async saveMax(u) {
+      const v = parseInt(u._max, 10);
+      if (!v || v < 1) { Dcu.toast('并发上限须为 ≥1 的整数'); return; }
+      const r = await Dcu.put('/admin/users/' + u.id, { maxConcurrency: v });
+      if (r.ok) { Dcu.toast('已更新 ' + u.name + ' 并发上限为 ' + v); this.loadUsers(); }
+      else Dcu.toast(r.message || '更新失败');
     },
     async toggleEnabled(u) {
       const enabled = u.enabled == 1 ? 0 : 1;

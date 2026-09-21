@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.wowtools.dcu.pojo.AnthropicMessageRequest;
 import org.wowtools.dcu.service.ConcurrencyGate;
 import org.wowtools.dcu.service.DcuService;
+import org.wowtools.dcu.service.UserConcurrencyGate;
 import org.wowtools.dcu.service.UserRegistry;
 import org.wowtools.dcu.stats.UnmodeledFieldObserver;
 import org.wowtools.dcu.util.Constant;
@@ -20,7 +21,11 @@ import java.util.UUID;
 /**
  * Anthropic /v1/messages 代理入口。
  * 鉴权：请求头 x-api-key 必须是已配置的可用用户 apiKey。
- * 并发控制：超过 max-concurrency 排队，排队满或等待超时返回 503 系统繁忙。
+ * 并发控制（两级）：
+ * <ul>
+ *   <li>用户级：单用户超过其 max_concurrency 立即拒绝，返回 429（不排队）。</li>
+ *   <li>全局级：超过 max-concurrency 排队，排队满或等待超时返回 503 系统繁忙。</li>
+ * </ul>
  */
 @Slf4j
 @RestController
@@ -31,6 +36,7 @@ public class AnthropicController {
     private final DcuService dcuService;
     private final UserRegistry userRegistry;
     private final ConcurrencyGate gate;
+    private final UserConcurrencyGate userGate;
     private final UnmodeledFieldObserver unmodeledFieldObserver;
 
     @PostMapping("/messages")
@@ -55,8 +61,19 @@ public class AnthropicController {
         }
         String user = userRegistry.nameOf(apiKey);
 
-        // 并发门：拿不到在途许可（排队满 / 等待超时）即系统繁忙
+        // 用户级并发门：单用户超过其 max_concurrency 立即拒绝（429，不排队）
+        int userLimit = userRegistry.maxConcurrencyOf(apiKey);
+        if (!userGate.acquire(user, userLimit)) {
+            response.setStatus(429);
+            response.setContentType("application/json");
+            response.setCharacterEncoding("UTF-8");
+            response.getWriter().write(
+                    "{\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"user concurrency limit reached, please retry later\"}}");
+            return;
+        }
+        // 全局并发门：拿不到在途许可（排队满 / 等待超时）即系统繁忙
         if (!gate.acquire()) {
+            userGate.release(user);
             response.setStatus(503);
             response.setContentType("application/json");
             response.setCharacterEncoding("UTF-8");
@@ -73,6 +90,7 @@ public class AnthropicController {
             dcuService.handle(anthropicMessageRequest, user, logId, response);
         } finally {
             gate.release();
+            userGate.release(user);
         }
     }
 }

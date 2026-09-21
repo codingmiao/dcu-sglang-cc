@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 import org.wowtools.dcu.config.DcuConfiguration;
+import org.wowtools.dcu.service.UserRegistry;
 
 import java.security.SecureRandom;
 import java.sql.Connection;
@@ -78,31 +79,34 @@ public class UserStore {
      * 列出全部用户（管理页）。
      */
     public List<Map<String, Object>> list() {
-        String sql = "SELECT id, name, api_key, enabled, created_at, updated_at FROM user ORDER BY id";
+        String sql = "SELECT id, name, api_key, enabled, max_concurrency, created_at, updated_at FROM user ORDER BY id";
         return query(sql);
     }
 
     /**
      * 新增用户。
      *
-     * @param name   用户名
-     * @param apiKey 为空则自动生成
+     * @param name          用户名
+     * @param apiKey        为空则自动生成
+     * @param maxConcurrency 每用户最大并发；null 或 &lt;1 取默认 2
      * @return 新用户的 id
      */
-    public long create(String name, String apiKey) throws Exception {
+    public long create(String name, String apiKey, Integer maxConcurrency) throws Exception {
         if (apiKey == null || apiKey.isBlank()) {
             apiKey = generateKey();
         }
+        int max = normalizeMaxConcurrency(maxConcurrency);
         long now = System.currentTimeMillis();
         try (Connection c = sqlite.open();
              PreparedStatement ps = c.prepareStatement(
-                     "INSERT INTO user (name, api_key, enabled, created_at, updated_at) VALUES (?,?,?,?,?)",
+                     "INSERT INTO user (name, api_key, enabled, max_concurrency, created_at, updated_at) VALUES (?,?,?,?,?,?)",
                      Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, name);
             ps.setString(2, apiKey);
             ps.setInt(3, 1);
-            ps.setLong(4, now);
+            ps.setInt(4, max);
             ps.setLong(5, now);
+            ps.setLong(6, now);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 return keys.next() ? keys.getLong(1) : -1;
@@ -111,10 +115,10 @@ public class UserStore {
     }
 
     /**
-     * 更新用户（改名 / 重置 key / 启用禁用）。null 字段表示不改。
+     * 更新用户（改名 / 重置 key / 启用禁用 / 改并发上限）。null 字段表示不改。
      */
-    public void update(long id, String name, String apiKey, Integer enabled) throws Exception {
-        // 占位符顺序：updated_at, [name], [api_key], [enabled], id
+    public void update(long id, String name, String apiKey, Integer enabled, Integer maxConcurrency) throws Exception {
+        // 占位符顺序：updated_at, [name], [api_key], [enabled], [max_concurrency], id
         StringBuilder sql = new StringBuilder("UPDATE user SET updated_at=?");
         List<Object> args = new ArrayList<>();
         args.add(System.currentTimeMillis());
@@ -129,6 +133,10 @@ public class UserStore {
         if (enabled != null) {
             sql.append(", enabled=?");
             args.add(enabled);
+        }
+        if (maxConcurrency != null) {
+            sql.append(", max_concurrency=?");
+            args.add(normalizeMaxConcurrency(maxConcurrency));
         }
         sql.append(" WHERE id=?");
         args.add(id);
@@ -153,20 +161,20 @@ public class UserStore {
      */
     public String resetKey(long id) throws Exception {
         String key = generateKey();
-        update(id, null, key, null);
+        update(id, null, key, null, null);
         return key;
     }
 
     /**
-     * 单事务更新：重置 apiKey 的同时改 name / enabled（#13）。
+     * 单事务更新：重置 apiKey 的同时改 name / enabled / max_concurrency（#13）。
      * 原先 resetKey + update 是两次独立连接/事务，中间失败会留下"key 已重置但其它字段没改"
      * 的中间态；这里合并成一条 UPDATE，要么全改要么全不改。
      *
      * @param newKey 新 apiKey（非空）
      * @return 新 key
      */
-    public String updateWithKey(long id, String name, String newKey, Integer enabled) throws Exception {
-        // 占位符顺序：updated_at, api_key, [name], [enabled], id
+    public String updateWithKey(long id, String name, String newKey, Integer enabled, Integer maxConcurrency) throws Exception {
+        // 占位符顺序：updated_at, api_key, [name], [enabled], [max_concurrency], id
         StringBuilder sql = new StringBuilder("UPDATE user SET updated_at=?, api_key=?");
         List<Object> args = new ArrayList<>();
         args.add(System.currentTimeMillis());
@@ -178,6 +186,10 @@ public class UserStore {
         if (enabled != null) {
             sql.append(", enabled=?");
             args.add(enabled);
+        }
+        if (maxConcurrency != null) {
+            sql.append(", max_concurrency=?");
+            args.add(normalizeMaxConcurrency(maxConcurrency));
         }
         sql.append(" WHERE id=?");
         args.add(id);
@@ -207,6 +219,16 @@ public class UserStore {
             ps.setLong(1, id);
             ps.executeUpdate();
         }
+    }
+
+    /**
+     * 归一化每用户最大并发：null 或 &lt;1 取默认 2。
+     */
+    private static int normalizeMaxConcurrency(Integer maxConcurrency) {
+        if (maxConcurrency == null || maxConcurrency < 1) {
+            return UserRegistry.DEFAULT_MAX_CONCURRENCY;
+        }
+        return maxConcurrency;
     }
 
     /**

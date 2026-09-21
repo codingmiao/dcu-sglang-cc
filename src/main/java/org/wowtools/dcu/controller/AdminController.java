@@ -133,7 +133,9 @@ public class AdminController {
             return m;
         }
         try {
-            long id = userStore.create(body.get("name"), body.get("apiKey"));
+            Integer maxConcurrency = body.get("maxConcurrency") == null
+                    ? null : Integer.valueOf(body.get("maxConcurrency").toString());
+            long id = userStore.create(body.get("name"), body.get("apiKey"), maxConcurrency);
             userRegistry.refresh();
             m.put("ok", true);
             m.put("id", id);
@@ -159,13 +161,15 @@ public class AdminController {
         try {
             String name = (String) body.get("name");
             Integer enabled = body.get("enabled") == null ? null : ((Number) body.get("enabled")).intValue();
+            Integer maxConcurrency = body.get("maxConcurrency") == null
+                    ? null : ((Number) body.get("maxConcurrency")).intValue();
             if (Boolean.TRUE.equals(body.get("resetKey"))) {
-                // 重置 key 与改 name/enabled 合并为单事务（#13），避免中间态
-                String key = userStore.updateWithKey(id, name, userStore.generateKey(), enabled);
+                // 重置 key 与改 name/enabled/max_concurrency 合并为单事务（#13），避免中间态
+                String key = userStore.updateWithKey(id, name, userStore.generateKey(), enabled, maxConcurrency);
                 m.put("ok", true);
                 m.put("newKey", key);
             } else {
-                userStore.update(id, name, null, enabled);
+                userStore.update(id, name, null, enabled, maxConcurrency);
                 m.put("ok", true);
             }
             userRegistry.refresh();

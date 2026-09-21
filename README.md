@@ -19,6 +19,8 @@
 - **协议适配**：修 sglang 与 Anthropic 的兼容性问题（见下"协议修复"）
 - **用户鉴权**：`x-api-key` / `Authorization: Bearer`，内存缓存 + SQLite 持久化
 - **并发门**：两级公平信号量（并发许可 + 排队许可），排队满或超时返回 503
+- **用户级并发**：每个用户最多同时跑 `max_concurrency` 个请求（默认 2，管理页可配），
+  超限立即返回 429（不排队）
 - **统计**：可聚合指标（token、耗时、成功率、改动行数）写 SQLite，
   完整请求/响应体写滚动 jsonl，未知字段路径单独观测
 - **用户管理**：管理页增删改用户，登录后维护
@@ -39,7 +41,8 @@
 ```
 AnthropicController (/v1/messages)
   → 鉴权（x-api-key 或 Bearer，UserRegistry 内存缓存）
-  → ConcurrencyGate.acquire()（两级信号量：并发 + 排队）
+  → UserConcurrencyGate.acquire(user, limit)（用户级：超限 429，不排队）
+  → ConcurrencyGate.acquire()（全局两级信号量：并发 + 排队，满/超时 503）
   → DcuService.handle
       → RequestFix.fixSystemRole（sglang 只认 assistant/user）
       → SglangClient.send / sendStream（okhttp，model 改写为 innerModel）
