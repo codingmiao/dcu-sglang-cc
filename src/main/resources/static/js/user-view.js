@@ -48,15 +48,15 @@ window.UserView = {
         </div>
         <h3 style="margin-top:14px">最近调用记录</h3>
         <table>
-          <thead><tr><th>时间</th><th>logId</th><th>模型</th><th>流式</th><th>输入</th><th>缓存命中</th><th>输出</th><th>改动</th><th>耗时</th><th>stop</th><th>结果</th><th>失败原因</th></tr></thead>
+          <thead><tr><th>时间</th><th>logId</th><th>模型</th><th>流式</th><th>总输入</th><th>缓存命中</th><th>输出</th><th>改动</th><th>耗时</th><th>stop</th><th>结果</th><th>失败原因</th></tr></thead>
           <tbody>
             <tr v-for="r in records" :key="r.log_id" class="clickable" @click="openRecord(r.log_id)">
               <td>{{ Dcu.ts(r.ts) }}</td>
               <td class="muted">{{ Dcu.shortId(r.log_id) }}</td>
               <td>{{ r.model }}</td>
               <td><span class="tag stream" v-if="r.stream==1">stream</span><span v-else class="muted">-</span></td>
-              <td>{{ Dcu.fmt(r.input_tokens) }}</td>
-              <td><span class="cache-hit" v-if="r.cache_read_input_tokens">{{ Dcu.fmt(r.cache_read_input_tokens) }}</span><span v-else class="muted">-</span></td>
+              <td>{{ Dcu.fmt((r.input_tokens || 0) + (r.cache_read_input_tokens || 0)) }}</td>
+              <td><span class="cache-hit" v-if="r.cache_read_input_tokens">{{ Dcu.fmt(r.cache_read_input_tokens) }} <span class="muted">({{ cacheRate(r) }}%)</span></span><span v-else class="muted">-</span></td>
               <td>{{ Dcu.fmt(r.output_tokens) }}</td>
               <td>{{ Dcu.fmt(r.lines_changed) }}</td>
               <td>{{ Dcu.fmtMs(r.cost) }} ms</td>
@@ -90,7 +90,7 @@ window.UserView = {
       range: '24h',
       series: [
         { key: 'requests', label: '请求数' },
-        { key: 'input_tokens', label: '输入token' },
+        { key: 'total_input_tokens', label: '输入token' },
         { key: 'cache_read_input_tokens', label: '缓存命中token' },
         { key: 'output_tokens', label: '输出token' },
         { key: 'lines_changed', label: '改动行数' },
