@@ -172,15 +172,15 @@ class SchemaMigratorTest {
 
     /**
      * 用真实 classpath 迁移（V1 baseline + V2 lines_changed + V3 error
-     * + V4 user_max_concurrency + V5 cache_read_input_tokens）跑一遍，
-     * 确认各版本加了对应列。
+     * + V4 user_max_concurrency + V5 cache_read_input_tokens + V6 ts 归一化）
+     * 跑一遍，确认各版本加了对应列。
      */
     @Test
     void realClasspathMigrationsAddLinesChanged() throws Exception {
         Sqlite sqlite = newSqlite();
         new SchemaMigrator(sqlite).migrate(); // 公共构造器 = 默认 classpath 位置
 
-        assertEquals(5, currentVersion(sqlite), "真实迁移应升到 v5");
+        assertEquals(6, currentVersion(sqlite), "真实迁移应升到 v6");
         assertTrue(hasColumn(sqlite, "request_stat", "lines_changed"), "V2 应加 lines_changed 列");
         assertTrue(hasColumn(sqlite, "request_stat", "error"), "V3 应加 error 列");
         assertTrue(hasColumn(sqlite, "request_stat", "log_id"), "V1 应建 request_stat 表");
@@ -188,5 +188,40 @@ class SchemaMigratorTest {
         assertTrue(hasColumn(sqlite, "user", "max_concurrency"), "V4 应加 user.max_concurrency 列");
         assertTrue(hasColumn(sqlite, "request_stat", "cache_read_input_tokens"),
                 "V5 应加 request_stat.cache_read_input_tokens 列");
+    }
+
+    /**
+     * V6：把秒级 ts 归一化成毫秒，毫秒级 ts 不动。
+     * 判据 ts < 1e11（1e11 毫秒=1973 年，1e11 秒=5138 年）。
+     */
+    @Test
+    void v6NormalizesSecondScaleTsToMillis() throws Exception {
+        Sqlite sqlite = newSqlite();
+        // 先建 V1 的表并塞两行：一行秒级、一行毫秒级
+        try (Connection c = sqlite.open(); Statement st = c.createStatement()) {
+            st.execute("CREATE TABLE request_stat (id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                    + "log_id TEXT, user TEXT, model TEXT, stream INTEGER, input_tokens INTEGER, "
+                    + "output_tokens INTEGER, cost INTEGER, stop_reason TEXT, success INTEGER, ts INTEGER)");
+            st.execute("CREATE TABLE user (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, "
+                    + "api_key TEXT UNIQUE NOT NULL, enabled INTEGER NOT NULL DEFAULT 1, "
+                    + "created_at INTEGER, updated_at INTEGER)");
+            // 秒级（~2023-11-14）与毫秒级（同一时刻）
+            st.execute("INSERT INTO request_stat (log_id, ts) VALUES ('sec', 1700000000)");
+            st.execute("INSERT INTO request_stat (log_id, ts) VALUES ('ms', 1700000000000)");
+        }
+
+        new SchemaMigrator(sqlite).migrate();
+
+        assertEquals(6, currentVersion(sqlite), "应升到 v6");
+        try (Connection c = sqlite.open(); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT ts FROM request_stat WHERE log_id='sec'")) {
+            rs.next();
+            assertEquals(1700000000000L, rs.getLong(1), "秒级 ts 应被乘 1000 归一化成毫秒");
+        }
+        try (Connection c = sqlite.open(); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT ts FROM request_stat WHERE log_id='ms'")) {
+            rs.next();
+            assertEquals(1700000000000L, rs.getLong(1), "毫秒级 ts 不应被改动");
+        }
     }
 }
